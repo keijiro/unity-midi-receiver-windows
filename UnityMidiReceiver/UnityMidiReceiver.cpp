@@ -8,26 +8,31 @@
 
 namespace
 {
+	// Converts handle value (64 or 32 bit) into 32 bit integer value.
+	// NOTE: Highly implementation-dependent! Never use on other platforms.
+	uint32_t ConvertHandle(HMIDIIN handle) {
+		return reinterpret_cast<uint32_t>(handle);
+	}
+
     // MIDI message structure.
     union Message {
         uint64_t uint64Value;
         
         struct
         {
-			HMIDIIN source;
+			uint32_t source;
             uint8_t status;
             uint8_t data1;
             uint8_t data2;
         };
         
         Message(HMIDIIN aSource, uint8_t aStatus, uint8_t aData1, uint8_t aData2)
-        :   source(aSource), status(aStatus), data1(aData1), data2(aData2)
+        :   source(ConvertHandle(aSource)), status(aStatus), data1(aData1), data2(aData2)
         {
         }
     };
     
     static_assert(sizeof(Message) == sizeof(uint64_t), "Wrong data size.");
-    static_assert(sizeof(HMIDIIN) == sizeof(uint32_t), "Wrong data size.");
 
     // MIDI device handle vector.
 	std::vector<HMIDIIN> handles;
@@ -91,14 +96,14 @@ namespace
 extern "C" int EXPORT_API UnityMIDIReceiver_CountEndpoints()
 {
 	ResetPluginIfRequired();
-	return handles.size();
+	return static_cast<int>(handles.size());
 }
 
 // Get the unique ID of an endpoint.
 extern "C" uint32_t EXPORT_API UnityMIDIReceiver_GetEndpointIDAtIndex(int index)
 {
 	if (index >= 0 && index < static_cast<int>(handles.size())) {
-		return reinterpret_cast<uint32_t>(handles[index]);
+		return ConvertHandle(handles[index]);
 	} else {
 		return 0;
 	}
@@ -107,7 +112,15 @@ extern "C" uint32_t EXPORT_API UnityMIDIReceiver_GetEndpointIDAtIndex(int index)
 // Get the name of an endpoint.
 extern "C" const EXPORT_API char* UnityMIDIReceiver_GetEndpointName(uint32_t id)
 {
-	HMIDIIN handle = reinterpret_cast<HMIDIIN>(id);
+	// Find the handle from the handle vector.
+	HMIDIIN handle = NULL;
+	for (auto temp : handles) {
+		if (ConvertHandle(temp) == id) {
+			handle = temp;
+			break;
+		}
+	}
+	if (handle == NULL) return NULL;
 
 	// Determine the device ID from the given endpoint ID.
 	UINT deviceID;
