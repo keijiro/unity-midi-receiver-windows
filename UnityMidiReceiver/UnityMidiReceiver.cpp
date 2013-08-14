@@ -113,18 +113,14 @@ extern "C" uint32_t EXPORT_API UnityMIDIReceiver_GetEndpointIDAtIndex(int index)
 extern "C" const EXPORT_API char* UnityMIDIReceiver_GetEndpointName(uint32_t id)
 {
 	// Find the handle from the handle vector.
-	HMIDIIN handle = NULL;
-	for (auto temp : handles) {
-		if (ConvertHandle(temp) == id) {
-			handle = temp;
-			break;
-		}
-	}
-	if (handle == NULL) return NULL;
+	auto it = std::find_if(handles.begin(), handles.end(), [&](HMIDIIN h){
+		return ConvertHandle(h) == id;
+	});
+	if (it == handles.end()) return NULL;
 
 	// Determine the device ID from the given endpoint ID.
 	UINT deviceID;
-	MMRESULT result = midiInGetID(handle, &deviceID);
+	MMRESULT result = midiInGetID(*it, &deviceID);
 	if (result != MMSYSERR_NOERROR) return NULL;
 
 	// Retrieve the device caps.
